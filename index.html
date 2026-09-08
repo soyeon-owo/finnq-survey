@@ -545,7 +545,8 @@ function render() {
 function attachHandlers(step) {
   if (step.type === "single" || step.type === "single_other") {
     document.querySelectorAll("#optList .option").forEach(el => {
-      el.onclick = () => {
+      el.onclick = (e) => {
+        e.preventDefault();
         const prev = state.answers[step.id];
         state.answers[step.id] = el.dataset.value;
         // '기타'에서 다른 답으로 바꾸면 직접입력 값도 함께 정리
@@ -561,7 +562,8 @@ function attachHandlers(step) {
 
   if (step.type === "checkbox2") {
     document.querySelectorAll("#optList .option").forEach(el => {
-      el.onclick = () => {
+      el.onclick = (e) => {
+        e.preventDefault();
         if (el.classList.contains("disabled")) return;
         const v = el.dataset.value;
         let chosen = state.answers[step.id] || [];
@@ -578,7 +580,7 @@ function attachHandlers(step) {
       el.onclick = () => { state.answers[step.id] = parseInt(el.dataset.value, 10); render(); };
     });
     document.querySelectorAll("#naOpt .option").forEach(el => {
-      el.onclick = () => { state.answers[step.id] = el.dataset.value; render(); };
+      el.onclick = (e) => { e.preventDefault(); state.answers[step.id] = el.dataset.value; render(); };
     });
   }
 
@@ -595,13 +597,13 @@ function attachUtFormHandlers() {
   document.getElementById("utName").oninput = (e) => { u.name = e.target.value; };
   document.getElementById("utContact").oninput = (e) => { u.contact = e.target.value; };
   document.querySelectorAll("#utMethod .option").forEach(el => {
-    el.onclick = () => { u.method = el.dataset.value; render(); };
+    el.onclick = (e) => { e.preventDefault(); u.method = el.dataset.value; render(); };
   });
   document.querySelectorAll("#utFinnq .option").forEach(el => {
-    el.onclick = () => { u.finnq = el.dataset.value; render(); };
+    el.onclick = (e) => { e.preventDefault(); u.finnq = el.dataset.value; render(); };
   });
   document.querySelectorAll("#utConsent .option").forEach(el => {
-    el.onclick = () => { u.consent = (u.consent === "동의") ? null : "동의"; render(); };
+    el.onclick = (e) => { e.preventDefault(); u.consent = (u.consent === "동의") ? null : "동의"; render(); };
   });
   document.getElementById("skipUtForm").onclick = () => goTo("complete");
   document.getElementById("nextBtn").onclick = () => {
