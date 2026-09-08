@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>자산관리 앱 이용 경험 조사</title>
+<style>
+  :root {
+    --bg: #f7f7f8;
+    --card: #ffffff;
+    --text: #1a1a1a;
+    --muted: #6b6b6b;
+    --accent: #2f6fed;
+    --accent-text: #ffffff;
+    --border: #e2e2e6;
+    --danger: #d84343;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+  }
+  .wrap {
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: 100vh;
+    padding: 20px 20px 40px;
+    display: flex;
+    flex-direction: column;
+  }
+  .topbar { display: flex; align-items: center; justify-content: space-between; min-height: 24px; margin-bottom: 8px; }
+  .back-btn {
+    background: none; border: none; padding: 4px 0; margin: 0;
+    color: var(--muted); font-size: 14px; cursor: pointer; font-family: inherit;
+  }
+  .back-btn:disabled { visibility: hidden; }
+  .progress { font-size: 13px; color: var(--muted); }
+  .progress-bar { height: 4px; background: var(--border); border-radius: 4px; overflow: hidden; margin-bottom: 20px; }
+  .progress-bar-fill { height: 100%; background: var(--accent); transition: width 0.2s ease; }
+  .card {
+    background: var(--card);
+    border-radius: 16px;
+    padding: 24px 20px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    flex: 1;
+  }
+  h1 { font-size: 19px; margin: 0 0 12px; }
+  h2 { font-size: 17px; margin: 0 0 16px; line-height: 1.45; }
+  p { color: var(--muted); font-size: 14px; }
+  .intro-block p { margin: 6px 0; }
+  .options { display: flex; flex-direction: column; gap: 10px; margin-bottom: 8px; }
+  .option {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    cursor: pointer;
+    font-size: 15px;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .option.selected { border-color: var(--accent); background: #eef3ff; }
+  .option.disabled { opacity: 0.4; cursor: not-allowed; }
+  .option input { margin-top: 3px; flex-shrink: 0; }
+  .scale-row { display: flex; gap: 8px; margin-bottom: 10px; }
+  .scale-btn {
+    flex: 1;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 0;
+    text-align: center;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    background: #fff;
+  }
+  .scale-btn.selected { border-color: var(--accent); background: var(--accent); color: var(--accent-text); }
+  .scale-labels { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 14px; }
+  input[type=text], textarea {
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 16px;
+    font-family: inherit;
+    margin-top: 8px;
+  }
+  textarea { min-height: 110px; resize: vertical; }
+  .error { color: var(--danger); font-size: 13px; margin: 10px 0 0; display: none; }
+  .error.show { display: block; }
+  .footer { margin-top: 20px; }
+  button.primary {
+    width: 100%;
+    padding: 15px 0;
+    border: none;
+    border-radius: 12px;
+    background: var(--accent);
+    color: var(--accent-text);
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .hint { font-size: 13px; color: var(--muted); margin-top: 0; margin-bottom: 12px; }
+  .note { font-size: 13px; color: var(--muted); background: #f4f6fb; border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; }
+  .center { text-align: center; }
+  .emoji { font-size: 36px; margin-bottom: 12px; }
+  a.link-btn {
+    display: block; text-align: center; margin-top: 16px; padding: 15px 0;
+    border-radius: 12px; background: #111; color: #fff; text-decoration: none; font-weight: 600;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <button class="back-btn" id="backBtn" disabled>← 이전</button>
+    <div id="progressLabel" class="progress"></div>
+  </div>
+  <div class="progress-bar"><div id="progressFill" class="progress-bar-fill" style="width:0%"></div></div>
+  <div id="card" class="card"></div>
+</div>
+
+<script>
+/* ========================================================================
+   설정 — Supabase 프로젝트 정보를 여기에 채워넣으세요.
+   Supabase 대시보드 → Project Settings → API 에서 확인할 수 있습니다.
+   ======================================================================== */
+// SUPABASE_URL은 반드시 "기본 주소"만 넣으세요. 뒤에 /rest/v1/ 을 붙이면 안 됩니다.
+// (코드가 요청할 때 /rest/v1/... 를 알아서 붙입니다)
+const SUPABASE_URL = "https://krqrlsswujnewkkqtidp.supabase.co"; // 예: https://xxxxxxxx.supabase.co
+const SUPABASE_ANON_KEY = "sb_publishable_rsrUWKQS_1zxqoMBcWpEIw_-K4OoIz2";
+/* UT 사례비 안내 문구 — 정하신 내용으로 이 한 줄만 바꾸세요. */
+const UT_REWARD_TEXT = "소정의 사례비(커피 기프티콘)를 드립니다";
+/* ======================================================================== */
+
+/* 이 브라우저 세션의 응답 고유번호 — 재전송해도 중복 저장되지 않게 합니다. */
+let RESPONSE_UUID = null;   // 설문 저장 시작 시 발급 (아래 newUuid 사용)
+let UT_APPLICANT_UUID = null; // UT 신청 저장 시 별도로 발급 (설문과 연결되지 않음)
+
+const state = { answers: {}, ut: {}, submitting: false, submitted: false, screenoutSent: false,
+                utSubmitting: false, utSubmitted: false };
+
+/* UT 신청 기록에는 설문 응답과 이어지는 값을 절대 넣지 않습니다.
+   설문의 RESPONSE_UUID와 다른, 완전히 새로운 번호를 씁니다. */
+function newUuid() {
+  return (crypto.randomUUID
+    ? crypto.randomUUID()
+    : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
+        const r = Math.random() * 16 | 0;
+        return (c === "x" ? r : (r & 0x3 | 0x8)).toString(16);
+      }));
+}
+RESPONSE_UUID = newUuid();
+const history = [];
+let currentId = "intro";
+
+function opt(value, label) { return { value, label }; }
+
+const QUESTION_TYPES = ["single","single_other","checkbox2","scale_na","scale_multi_na","textarea"];
+const QUESTION_ORDER = ["q1","q2","q3","q4","q5","q6","q7","q8","q9","q10","q11","q12","q13","q14"];
+
+const steps = {
+  intro: { id: "intro", type: "intro" },
+
+  q1: { id: "q1", type: "single", required: true,
+    title: "Q1. 연령대를 선택해주세요.",
+    options: [
+      opt("19이하", "만 19세 이하"),
+      opt("20-29", "20~29세"),
+      opt("30-39", "30~39세"),
+      opt("40이상", "만 40세 이상"),
+    ],
+    next: (v) => v === "19이하" ? "terminate_age" : (v === "40이상" ? "terminate_age" : "q2"),
+  },
+
+  q2: { id: "q2", type: "single_other", required: true, otherTrigger: "기타",
+    title: "Q2. 최근 3개월 안에 계좌·카드·투자 자산 현황을 확인하거나 관리하기 위해 가장 자주 사용한 앱은 무엇인가요?",
+    options: [
+      opt("토스", "토스"), opt("뱅크샐러드", "뱅크샐러드"), opt("카카오뱅크", "카카오뱅크"),
+      opt("핀크", "핀크"), opt("페이앱", "네이버페이·페이북 등 페이 앱"), opt("은행앱", "은행 자체 앱"),
+      opt("기타", "기타(직접입력)"),
+      opt("없음", "해당 목적으로 사용하는 앱이 없음"),
+    ],
+    next: (v) => v === "없음" ? "terminate_app" : "q3",
+  },
+
+  q3: { id: "q3", type: "single", required: true,
+    title: "Q3. 그 앱을 얼마나 자주 여시나요?",
+    note: "앞으로 나오는 질문의 '그 앱'은 모두 Q2에서 고르신 앱을 말합니다.",
+    options: [
+      opt("매일", "거의 매일"), opt("주2-4", "주 2~4회"), opt("주1", "주 1회 정도"),
+      opt("월1-3", "월 1~3회"), opt("월1미만", "월 1회 미만"),
+    ],
+    next: () => "q4",
+  },
+
+  q4: { id: "q4", type: "single_other", required: true, otherTrigger: "기타",
+    title: "Q4. 최근 3개월 안에 그 앱에서 계좌·카드·투자 자산을 확인하거나 관리할 때, 가장 큰 목적 하나를 골라주세요.",
+    options: [
+      opt("잔액", "지금 쓸 수 있는 돈(잔액)이 얼마인지 확인하려고"),
+      opt("전체자산", "전체 자산이 얼마인지 확인하려고"),
+      opt("소비내역", "이번 달 소비 내역을 보려고"),
+      opt("카드값", "카드값이 얼마 나갈지 확인하려고"),
+      opt("투자수익", "예적금·투자 수익을 확인하려고"),
+      opt("기타", "기타(직접입력)"),
+    ],
+    next: () => "q5",
+  },
+
+  q5: { id: "q5", type: "checkbox2", required: true,
+    title: "Q5. 자산관리 앱을 사용할 때 가장 중요하게 생각하는 항목 2개를 골라주세요.",
+    hint: "정확히 2개를 선택해주세요. (순서는 상관없습니다)",
+    options: [
+      opt("잔액", "현재 사용할 수 있는 입출금 잔액을 빠르게 확인"),
+      opt("변화구성", "자산의 변화와 구성 비율을 쉽게 파악"),
+      opt("통합조회", "필요한 계좌·카드 정보를 여러 앱이나 메뉴를 오가지 않고 확인"),
+      opt("개인화", "계좌 목록을 내 사용 방식에 맞게 정리"),
+    ],
+    next: () => "q6",
+  },
+
+  q6: { id: "q6", type: "scale_na", required: true,
+    title: "Q6. 최근 3개월 안에 그 앱을 이용해 입출금 계좌에서 바로 사용할 수 있는 잔액을 가장 최근에 확인하려 했을 때, 얼마나 쉬웠나요?",
+    naLabel: "최근 3개월 안에 확인하려 한 적 없음",
+    // Q6에서 "확인하려 한 적 없음"이면 Q7은 자동으로 "시도없음"으로 처리하고 건너뜁니다.
+    next: (v) => {
+      if (v === "na") { state.answers.q7 = "시도없음"; return "q8"; }
+      if (state.answers.q7 === "시도없음") delete state.answers.q7;
+      return "q7";
+    },
+  },
+
+  q7: { id: "q7", type: "single", required: true,
+    title: "Q7. 같은 상황에서, 그 잔액을 확인하기까지 어떤 과정을 거쳤나요?",
+    options: [
+      opt("첫화면", "앱을 연 첫 화면에서 바로 확인했다"),
+      opt("스크롤", "첫 화면 안에서 스크롤하여 확인했다"),
+      opt("예상메뉴", "예상한 메뉴 한 곳으로 이동하여 확인했다"),
+      opt("여러메뉴", "위치를 몰라 두 개 이상의 메뉴·화면을 확인했다"),
+      opt("실패", "끝내 확인하지 못했다"),
+      opt("기억안남", "잘 기억나지 않는다"),
+    ],
+    next: () => "q8",
+  },
+
+  q8: { id: "q8", type: "scale_na", required: true,
+    title: "Q8. 최근 3개월 안에 그 앱에서 자산 증감(한 달 전과 비교해 늘었는지 줄었는지)을 가장 최근에 확인하려 했을 때, 얼마나 쉬웠나요?",
+    naLabel: "최근 3개월 안에 확인하려 한 적 없음",
+    next: () => "q9",
+  },
+
+  q9: { id: "q9", type: "single", required: true,
+    title: "Q9. 자산이 얼마나 변했는지 확인하려면 보통 어떻게 하시나요?",
+    options: [
+      opt("증감문구", '앱에 표시된 증감 금액·문구를 본다 (예: "+12,000원")'),
+      opt("그래프", "앱의 그래프·차트를 본다"),
+      opt("직접비교", "현재와 과거 숫자를 직접 비교한다"),
+      opt("기타기록", "가계부·메모 등 다른 기록과 비교한다"),
+      opt("불필요", "확인할 필요를 느끼지 않아 확인하지 않는다"),
+      opt("방법모름", "확인하고 싶었지만, 앱에서 제공하는지 또는 어디서 확인하는지 알지 못했다"),
+    ],
+    next: () => "q10",
+  },
+
+  q10: { id: "q10", type: "scale_na", required: true,
+    title: "Q10. 최근 3개월 안에 그 앱에서 자산 구성비율(입출금·예적금·투자 등 비율)을 가장 최근에 확인하려 했을 때, 얼마나 쉬웠나요?",
+    naLabel: "최근 3개월 안에 확인하려 한 적 없음",
+    next: () => "q11",
+  },
+
+  q11: { id: "q11", type: "single", required: true,
+    title: "Q11. 최근 3개월 안에 여러 금융기관의 정보를 함께 확인했던 가장 최근 상황에서, 어떻게 확인하셨나요?",
+    options: [
+      opt("한화면", "한 앱의 한 화면에서 확인했다"),
+      opt("한앱여러메뉴", "한 앱 안에서 여러 메뉴를 이동해 확인했다"),
+      opt("여러앱", "여러 금융 앱을 번갈아 열어 확인했다"),
+      opt("실패", "필요한 정보를 끝내 확인하지 못했다"),
+      opt("해당없음", "여러 금융기관의 정보를 함께 확인할 일이 없었다 (해당없음)"),
+    ],
+    next: () => "q12",
+  },
+
+  q12: { id: "q12", type: "scale_multi_na", required: true,
+    title: "Q12. 최근 3개월 안에 그 앱에서 할부 금액을 포함한 이번 달 예정 카드 결제액을 가장 최근에 확인하려 했을 때, 얼마나 쉬웠나요?",
+    naOptions: [
+      opt("no_card", "신용카드를 사용하지 않는다"),
+      opt("not_checked", "신용카드는 사용하지만 최근 3개월 안에 이 앱에서 확인하려 한 적이 없다"),
+    ],
+    next: () => "q13",
+  },
+
+  q13: { id: "q13", type: "single", required: true,
+    title: "Q13. 최근 3개월 안에 그 앱을 사용하면서, 자산·계좌 목록을 내가 자주 확인하는 방식에 맞게 정리하고 싶었던 적이 있나요?",
+    options: [
+      opt("쉽게정리", "필요했고, 쉽게 정리했다"),
+      opt("어렵게정리", "필요했고, 정리했지만 과정이 어려웠다"),
+      opt("방법못찾음", "필요했지만, 방법을 찾지 못했다"),
+      opt("안찾아봄", "필요했지만, 굳이 찾아보지 않았다"),
+      opt("불필요", "필요성을 느끼지 않았다"),
+    ],
+    next: () => "q14",
+  },
+
+  q14: { id: "q14", type: "textarea", required: false,
+    title: "Q14. 최근 자산관리 앱을 사용하면서 불편하거나 답답했던 상황이 있다면 한 가지 적어주세요.",
+    hint: "무엇을 확인하려 했는지, 어디에서 막혔는지, 결국 어떻게 해결했는지를 간단히 적어주세요. 선택 응답이라 비워두셔도 됩니다. 이름·계좌번호·구체적인 금융 금액 등 개인정보는 적지 말아주세요.",
+    next: () => "submitting",
+  },
+
+  terminate_age: { id: "terminate_age", type: "terminate",
+    text: "응답해주셔서 감사합니다. 이번 조사는 프로젝트 범위상 만 20~39세 사용자를 대상으로 진행하고 있어 설문이 여기서 종료됩니다.",
+  },
+  terminate_app: { id: "terminate_app", type: "terminate",
+    text: "응답해주셔서 감사합니다. 본 조사는 계좌·카드·투자 자산 관리 목적으로 앱을 사용해보신 분들을 대상으로 하고 있어, 여기서 설문이 종료됩니다.",
+  },
+  submitting: { id: "submitting", type: "submitting" },
+
+  /* --- 설문 저장 완료 후: UT 참여 의향 (설문 응답과 분리 저장) --- */
+  ut_ask: { id: "ut_ask", type: "single", isExtra: true, required: true,
+    title: "설문은 여기까지예요. 마지막으로 하나만 여쭤볼게요.",
+    note: "개선안 화면을 직접 써보는 <b>짧은 온라인 테스트</b>에도 참여해주실 수 있나요? 만나거나 통화하지 않고, 링크로 접속해 화면을 몇 번 눌러보는 방식이며 10~15분 정도 걸립니다. 참여해주시면 " + UT_REWARD_TEXT + ".",
+    options: [
+      opt("가능", "참여할 수 있어요"),
+      opt("불가능", "참여는 어려워요"),
+    ],
+    next: (v) => v === "가능" ? "ut_form" : "complete",
+  },
+
+  ut_form: { id: "ut_form", type: "ut_form", isExtra: true, next: () => "ut_submitting" },
+  ut_submitting: { id: "ut_submitting", type: "ut_submitting", isExtra: true },
+  ut_done: { id: "ut_done", type: "ut_done", isExtra: true },
+
+  complete: { id: "complete", type: "complete" },
+  error: { id: "error", type: "error" },
+  ut_error: { id: "ut_error", type: "ut_error", isExtra: true },
+};
+
+/* ------------------------------------------------------------------ */
+/* 렌더링                                                              */
+/* ------------------------------------------------------------------ */
+function render() {
+  const step = steps[currentId];
+  const card = document.getElementById("card");
+  const backBtn = document.getElementById("backBtn");
+  const isQuestion = QUESTION_TYPES.includes(step.type);
+
+  // 제출이 끝난 뒤의 UT 단계에서는 뒤로가기를 막습니다(설문 재제출 방지).
+  backBtn.disabled = !(isQuestion && !step.isExtra && history.length > 0);
+
+  if (isQuestion && !step.isExtra) {
+    const qNum = QUESTION_ORDER.indexOf(step.id) + 1;
+    document.getElementById("progressLabel").textContent = qNum + " / " + QUESTION_ORDER.length;
+    document.getElementById("progressFill").style.width = Math.round((qNum / QUESTION_ORDER.length) * 100) + "%";
+  } else {
+    document.getElementById("progressLabel").textContent = step.isExtra ? "설문 완료" : "";
+    document.getElementById("progressFill").style.width = "100%";
+  }
+
+  if (step.type === "intro") {
+    card.innerHTML = `
+      <h1>자산관리 앱 이용 경험 조사</h1>
+      <div class="intro-block">
+        <p>이 설문은 계좌·카드·투자 자산의 '조회·관리' 경험을 개선하기 위한 학생 포트폴리오 조사입니다.</p>
+        <p>· 소요 시간 약 3~4분</p>
+        <p>· 설문 응답에는 이름·연락처 등 직접 식별 정보를 수집하지 않습니다</p>
+        <p>· 설문이 끝난 뒤, 후속 테스트 참여를 원하시는 분만 따로 연락처를 남기실 수 있습니다. 이때 남기신 연락처는 <b>설문 응답과 분리해 별도로 저장</b>되며, 서로 연결되지 않습니다</p>
+        <p>· 응답은 통계 및 주제 분석에 사용되며, 서술형 답변 일부는 개인을 식별할 수 없도록 익명 처리하여 포트폴리오에 인용될 수 있습니다</p>
+        <p>· 서술형 응답에는 이름·계좌번호·구체적인 금융 금액 등 개인정보를 적지 말아주세요</p>
+        <p>· 원본 응답은 분석 완료 후 30일 이내 삭제하며, 익명화된 집계 결과와 인용문은 포트폴리오에 계속 사용될 수 있습니다</p>
+        <p>· 정답이 없는 조사입니다. 평소 느끼신 대로 답해주세요.</p>
+      </div>
+      <div class="footer"><button class="primary" id="nextBtn">설문 시작하기</button></div>`;
+    document.getElementById("nextBtn").onclick = () => goTo("q1");
+    return;
+  }
+
+  if (step.type === "terminate") {
+    logScreenout(step.id);
+    card.innerHTML = `<div class="center"><div class="emoji">🙏</div>
+      <p style="color:var(--text); font-size:15px;">${step.text}</p></div>`;
+    return;
+  }
+
+  if (step.type === "submitting") {
+    card.innerHTML = `<div class="center"><p>제출 중입니다…</p></div>`;
+    submitAnswers();
+    return;
+  }
+
+  if (step.type === "complete") {
+    card.innerHTML = `<div class="center"><div class="emoji">✅</div>
+      <h2>설문에 응해주셔서 감사합니다!</h2>
+      <p>보내주신 답변은 자산관리 앱 화면을 개선하는 데 소중히 쓰겠습니다.</p></div>`;
+    return;
+  }
+
+  if (step.type === "ut_done") {
+    card.innerHTML = `<div class="center"><div class="emoji">🙌</div>
+      <h2>신청이 완료되었습니다!</h2>
+      <p>설문과 테스트 신청 모두 감사합니다. 남겨주신 연락 수단으로 테스트 링크를 보내드릴게요.</p></div>`;
+    return;
+  }
+
+  if (step.type === "ut_submitting") {
+    card.innerHTML = `<div class="center"><p>신청 내용을 보내는 중입니다…</p></div>`;
+    submitUtApplicant();
+    return;
+  }
+
+  if (step.type === "ut_error") {
+    card.innerHTML = `<div class="center">
+      <p style="color:var(--danger)">신청 내용을 보내지 못했습니다. 설문 응답은 이미 정상 접수되었으니 걱정하지 않으셔도 됩니다.</p>
+      <div class="footer"><button class="primary" id="retryUtBtn">다시 시도</button></div>
+      <p class="hint" id="skipUt" style="cursor:pointer; text-decoration:underline;">신청 없이 마치기</p></div>`;
+    document.getElementById("retryUtBtn").onclick = () => goTo("ut_submitting");
+    document.getElementById("skipUt").onclick = () => goTo("complete");
+    return;
+  }
+
+  if (step.type === "ut_form") {
+    const u = state.ut;
+    card.innerHTML = `
+      <h2>테스트 참여 신청</h2>
+      <p class="hint">아래 정보는 <b>설문 응답과 분리되어 저장</b>되며, 테스트 안내와 사례비 지급에만 사용됩니다.</p>
+
+      <p style="color:var(--text); font-size:15px; margin:18px 0 0;">어떻게 불러드리면 될까요?</p>
+      <input type="text" id="utName" maxlength="30" placeholder="이름 또는 닉네임" value="${(u.name || "").replace(/"/g, "&quot;")}">
+
+      <p style="color:var(--text); font-size:15px; margin:20px 0 0;">연락 수단을 골라주세요.</p>
+      <div class="options" id="utMethod" style="margin-top:10px;">
+        ${[["카톡","카카오톡 ID"],["전화","전화번호"],["이메일","이메일"],["인스타","인스타그램 ID"]]
+          .map(([v, l]) => `<label class="option${u.method === v ? " selected" : ""}" data-value="${v}">
+            <input type="radio" name="utMethod" ${u.method === v ? "checked" : ""}><span>${l}</span></label>`).join("")}
+      </div>
+      <input type="text" id="utContact" maxlength="100" placeholder="연락받으실 곳을 적어주세요" value="${(u.contact || "").replace(/"/g, "&quot;")}">
+
+      <p style="color:var(--text); font-size:15px; margin:20px 0 0;">핀크 앱의 자산 탭을 써보신 적이 있나요?</p>
+      <div class="options" id="utFinnq" style="margin-top:10px;">
+        ${[["주로사용","현재 주로 사용한다"],["가끔사용","현재 가끔 사용한다"],
+           ["과거사용","과거에 썼지만 최근에는 사용하지 않는다"],["미사용","사용해본 적이 없다"]]
+          .map(([v, l]) => `<label class="option${u.finnq === v ? " selected" : ""}" data-value="${v}">
+            <input type="radio" name="utFinnq" ${u.finnq === v ? "checked" : ""}><span>${l}</span></label>`).join("")}
+      </div>
+
+      <div class="note" style="margin-top:22px;">
+        <b>수집·이용 동의</b> (필수)<br><br>
+        · 수집 항목: 이름 또는 닉네임, 연락 수단<br>
+        · 이용 목적: 테스트 참여자 선정, 테스트 링크 발송, 사례비 지급<br>
+        · 보유 기간: 사례비 지급 완료 후 30일 이내 파기<br>
+        · 테스트 중에는 화면 클릭 경로와 소요 시간이 자동으로 기록되며, 이 기록은 분석 완료 후 30일 이내 파기합니다<br>
+        · 익명 처리된 집계 결과(성공률·평균 소요시간 등)는 포트폴리오에 사용될 수 있습니다<br>
+        · 동의를 거부하실 수 있으며, 이 경우 테스트 신청만 어려울 뿐 앞서 제출하신 설문 응답에는 아무 영향이 없습니다
+      </div>
+      <div class="options" id="utConsent">
+        <label class="option${u.consent === "동의" ? " selected" : ""}" data-value="동의">
+          <input type="radio" name="utConsent" ${u.consent === "동의" ? "checked" : ""}><span>위 내용에 동의합니다</span></label>
+      </div>
+
+      <p class="error" id="errMsg"></p>
+      <div class="footer"><button class="primary" id="nextBtn">신청 보내기</button></div>
+      <p class="hint" id="skipUtForm" style="text-align:center; cursor:pointer; text-decoration:underline; margin-top:14px;">신청하지 않고 마치기</p>`;
+    attachUtFormHandlers();
+    return;
+  }
+
+  if (step.type === "error") {
+    card.innerHTML = `<div class="center">
+      <p style="color:var(--danger)">제출 중 오류가 발생했습니다. 인터넷 연결을 확인하고 다시 시도해주세요.</p>
+      <div class="footer"><button class="primary" id="retryBtn">다시 시도</button></div></div>`;
+    document.getElementById("retryBtn").onclick = () => goTo("submitting");
+    return;
+  }
+
+  /* --- 질문 화면 --- */
+  let html = `<h2>${step.title}</h2>`;
+  if (step.note) html += `<div class="note">${step.note}</div>`;
+  if (step.hint) html += `<p class="hint">${step.hint}</p>`;
+
+  if (step.type === "single" || step.type === "single_other") {
+    html += `<div class="options" id="optList">`;
+    step.options.forEach(o => {
+      const sel = state.answers[step.id] === o.value;
+      html += `<label class="option${sel ? " selected" : ""}" data-value="${o.value}">
+        <input type="radio" name="${step.id}" ${sel ? "checked" : ""}><span>${o.label}</span></label>`;
+    });
+    html += `</div>`;
+    if (step.type === "single_other") {
+      const show = state.answers[step.id] === step.otherTrigger;
+      const val = (state.answers[step.id + "_other"] || "").replace(/"/g, "&quot;");
+      html += `<input type="text" id="otherInput" maxlength="100" placeholder="직접 입력해주세요"
+        style="display:${show ? "block" : "none"}" value="${val}">`;
+    }
+  }
+
+  if (step.type === "checkbox2") {
+    const chosen = state.answers[step.id] || [];
+    html += `<div class="options" id="optList">`;
+    step.options.forEach(o => {
+      const sel = chosen.includes(o.value);
+      const dis = !sel && chosen.length >= 2;
+      html += `<label class="option${sel ? " selected" : ""}${dis ? " disabled" : ""}" data-value="${o.value}">
+        <input type="checkbox" ${sel ? "checked" : ""} ${dis ? "disabled" : ""}><span>${o.label}</span></label>`;
+    });
+    html += `</div>`;
+  }
+
+  if (step.type === "scale_na" || step.type === "scale_multi_na") {
+    const cur = state.answers[step.id];
+    html += `<div class="scale-row" id="scaleRow">`;
+    for (let i = 1; i <= 5; i++) {
+      html += `<div class="scale-btn${cur === i ? " selected" : ""}" data-value="${i}">${i}</div>`;
+    }
+    html += `</div><div class="scale-labels"><span>1 매우 어려웠다</span><span>매우 쉬웠다 5</span></div>
+      <div class="options" id="naOpt">`;
+    const naList = step.type === "scale_na"
+      ? [opt("na", step.naLabel)]
+      : step.naOptions;
+    naList.forEach(o => {
+      const sel = cur === o.value;
+      html += `<label class="option${sel ? " selected" : ""}" data-value="${o.value}">
+        <input type="radio" name="${step.id}_na" ${sel ? "checked" : ""}><span>${o.label}</span></label>`;
+    });
+    html += `</div>`;
+  }
+
+  if (step.type === "textarea") {
+    const val = (state.answers[step.id] || "");
+    html += `<textarea id="textInput" maxlength="500" placeholder="자유롭게 적어주세요 (선택)">${val}</textarea>`;
+  }
+
+  html += `<p class="error" id="errMsg"></p>
+    <div class="footer"><button class="primary" id="nextBtn">${step.id === "q14" ? "제출하기" : "다음"}</button></div>`;
+
+  card.innerHTML = html;
+  attachHandlers(step);
+}
+
+function attachHandlers(step) {
+  if (step.type === "single" || step.type === "single_other") {
+    document.querySelectorAll("#optList .option").forEach(el => {
+      el.onclick = () => {
+        const prev = state.answers[step.id];
+        state.answers[step.id] = el.dataset.value;
+        // '기타'에서 다른 답으로 바꾸면 직접입력 값도 함께 정리
+        if (step.type === "single_other" && prev === step.otherTrigger && el.dataset.value !== step.otherTrigger) {
+          delete state.answers[step.id + "_other"];
+        }
+        render();
+      };
+    });
+    const other = document.getElementById("otherInput");
+    if (other) other.oninput = () => { state.answers[step.id + "_other"] = other.value; };
+  }
+
+  if (step.type === "checkbox2") {
+    document.querySelectorAll("#optList .option").forEach(el => {
+      el.onclick = () => {
+        if (el.classList.contains("disabled")) return;
+        const v = el.dataset.value;
+        let chosen = state.answers[step.id] || [];
+        chosen = chosen.includes(v) ? chosen.filter(x => x !== v)
+               : (chosen.length < 2 ? chosen.concat([v]) : chosen);
+        state.answers[step.id] = chosen;
+        render();
+      };
+    });
+  }
+
+  if (step.type === "scale_na" || step.type === "scale_multi_na") {
+    document.querySelectorAll("#scaleRow .scale-btn").forEach(el => {
+      el.onclick = () => { state.answers[step.id] = parseInt(el.dataset.value, 10); render(); };
+    });
+    document.querySelectorAll("#naOpt .option").forEach(el => {
+      el.onclick = () => { state.answers[step.id] = el.dataset.value; render(); };
+    });
+  }
+
+  if (step.type === "textarea") {
+    const t = document.getElementById("textInput");
+    t.oninput = () => { state.answers[step.id] = t.value; };
+  }
+
+  document.getElementById("nextBtn").onclick = () => handleNext(step);
+}
+
+function attachUtFormHandlers() {
+  const u = state.ut;
+  document.getElementById("utName").oninput = (e) => { u.name = e.target.value; };
+  document.getElementById("utContact").oninput = (e) => { u.contact = e.target.value; };
+  document.querySelectorAll("#utMethod .option").forEach(el => {
+    el.onclick = () => { u.method = el.dataset.value; render(); };
+  });
+  document.querySelectorAll("#utFinnq .option").forEach(el => {
+    el.onclick = () => { u.finnq = el.dataset.value; render(); };
+  });
+  document.querySelectorAll("#utConsent .option").forEach(el => {
+    el.onclick = () => { u.consent = (u.consent === "동의") ? null : "동의"; render(); };
+  });
+  document.getElementById("skipUtForm").onclick = () => goTo("complete");
+  document.getElementById("nextBtn").onclick = () => {
+    if (!(u.name || "").trim()) return showError("이름 또는 닉네임을 적어주세요.");
+    if (!u.method) return showError("연락 수단을 골라주세요.");
+    if (!(u.contact || "").trim()) return showError("연락받으실 곳을 적어주세요.");
+    if (!u.finnq) return showError("핀크 자산 탭 사용 경험을 골라주세요.");
+    if (u.consent !== "동의") return showError("수집·이용에 동의해주셔야 신청할 수 있습니다.");
+    goTo("ut_submitting");
+  };
+}
+
+function showError(msg) {
+  const el = document.getElementById("errMsg");
+  el.textContent = msg;
+  el.classList.add("show");
+}
+
+function handleNext(step) {
+  const val = state.answers[step.id];
+
+  if (step.required) {
+    if (step.type === "single" || step.type === "single_other") {
+      if (!val) return showError("응답을 선택해주세요.");
+      if (step.type === "single_other" && val === step.otherTrigger) {
+        if (!(state.answers[step.id + "_other"] || "").trim()) return showError("직접 입력 내용을 작성해주세요.");
+      }
+    }
+    if (step.type === "checkbox2" && (!val || val.length !== 2)) return showError("정확히 2개를 선택해주세요.");
+    if ((step.type === "scale_na" || step.type === "scale_multi_na") && val === undefined) {
+      return showError("응답을 선택해주세요.");
+    }
+  }
+
+  goTo(step.next(val), true);
+}
+
+function goTo(id, pushHistory) {
+  if (pushHistory && QUESTION_TYPES.includes(steps[currentId].type)) history.push(currentId);
+  else if (id === "q1") history.length = 0;
+  currentId = id;
+  window.scrollTo(0, 0);
+  render();
+}
+
+document.getElementById("backBtn").onclick = () => {
+  if (!history.length) return;
+  currentId = history.pop();
+  window.scrollTo(0, 0);
+  render();
+};
+
+/* ------------------------------------------------------------------ */
+/* 저장                                                                */
+/* ------------------------------------------------------------------ */
+function supabaseHeaders() {
+  // 주의: 새 형식의 publishable key(sb_publishable_...)는 JWT가 아니므로
+  // 반드시 apikey 헤더로만 보냅니다. Authorization: Bearer 로 보내면
+  // JWT 검증에 실패해 인증이 되지 않습니다. (Supabase 공식 문서 기준)
+  return {
+    "apikey": SUPABASE_ANON_KEY,
+    "Content-Type": "application/json",
+    "Prefer": "return=minimal",
+  };
+}
+
+async function logScreenout(terminateId) {
+  if (state.screenoutSent) return;
+  state.screenoutSent = true;
+  const age = state.answers.q1;
+  const reason = terminateId === "terminate_app" ? "no_app"
+    : (age === "19이하" ? "age_under20" : "age_over40");
+  try {
+    await fetch(SUPABASE_URL + "/rest/v1/survey_screenouts", {
+      method: "POST",
+      headers: supabaseHeaders(),
+      body: JSON.stringify({ response_uuid: RESPONSE_UUID, reason: reason, age_bracket: age || null }),
+    });
+  } catch (e) { /* 집계용이라 실패해도 응답자 경험에는 영향 없음 */ }
+}
+
+async function submitUtApplicant() {
+  if (state.utSubmitting || state.utSubmitted) return;
+  state.utSubmitting = true;
+  if (!UT_APPLICANT_UUID) UT_APPLICANT_UUID = newUuid();
+  const u = state.ut;
+
+  const payload = {
+    applicant_uuid: UT_APPLICANT_UUID,
+    name_or_nickname: (u.name || "").trim(),
+    contact_method: u.method,
+    contact_value: (u.contact || "").trim(),
+    finnq_experience: u.finnq,
+    consent_privacy: true,
+  };
+
+  try {
+    const res = await fetch(SUPABASE_URL + "/rest/v1/ut_applicants", {
+      method: "POST", headers: supabaseHeaders(), body: JSON.stringify(payload),
+    });
+    if (res.ok || res.status === 409) {
+      state.utSubmitted = true;
+      state.utSubmitting = false;
+      goTo("ut_done");
+      return;
+    }
+    throw new Error("ut submit failed: " + res.status + " " + (await res.text()));
+  } catch (e) {
+    console.error(e);
+    state.utSubmitting = false;
+    goTo("ut_error");
+  }
+}
+
+async function submitAnswers() {
+  if (state.submitting || state.submitted) return;
+  state.submitting = true;
+  const a = state.answers;
+
+  const payload = {
+    response_uuid: RESPONSE_UUID,
+    q1_age: a.q1,
+    q2_app: a.q2,
+    q2_app_other: a.q2 === "기타" ? (a.q2_other || "").trim() : null,
+    q3_frequency: a.q3,
+    q4_purpose: a.q4,
+    q4_purpose_other: a.q4 === "기타" ? (a.q4_other || "").trim() : null,
+    q5_choice_1: (a.q5 || [])[0] || null,
+    q5_choice_2: (a.q5 || [])[1] || null,
+    q6_score: typeof a.q6 === "number" ? a.q6 : null,
+    q6_na: a.q6 === "na",
+    q7_choice: a.q7,
+    q8_score: typeof a.q8 === "number" ? a.q8 : null,
+    q8_na: a.q8 === "na",
+    q9_choice: a.q9,
+    q10_score: typeof a.q10 === "number" ? a.q10 : null,
+    q10_na: a.q10 === "na",
+    q11_choice: a.q11,
+    q12_score: typeof a.q12 === "number" ? a.q12 : null,
+    q12_no_card: a.q12 === "no_card",
+    q12_not_checked_in_app: a.q12 === "not_checked",
+    q13_choice: a.q13,
+    q14_text: (a.q14 || "").trim() || null,
+  };
+
+  try {
+    const res = await fetch(SUPABASE_URL + "/rest/v1/survey_responses", {
+      method: "POST", headers: supabaseHeaders(), body: JSON.stringify(payload),
+    });
+    // 409 = 같은 응답번호가 이미 저장됨(재전송) → 성공으로 처리
+    if (res.ok || res.status === 409) {
+      state.submitted = true;
+      state.submitting = false;
+      goTo("ut_ask");
+      return;
+    }
+    throw new Error("submit failed: " + res.status + " " + (await res.text()));
+  } catch (e) {
+    console.error(e);
+    state.submitting = false;
+    goTo("error");
+  }
+}
+
+render();
+</script>
+</body>
+</html>
