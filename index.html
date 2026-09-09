@@ -143,9 +143,10 @@ const UT_REWARD_TEXT = "소정의 사례비(커피 기프티콘)를 드립니다
 /* 이 브라우저 세션의 응답 고유번호 — 재전송해도 중복 저장되지 않게 합니다. */
 let RESPONSE_UUID = null;   // 설문 저장 시작 시 발급 (아래 newUuid 사용)
 let UT_APPLICANT_UUID = null; // UT 신청 저장 시 별도로 발급 (설문과 연결되지 않음)
+let REWARD_ENTRY_UUID = null; // 이벤트 응모 저장 시 별도로 발급 (설문과 연결되지 않음)
 
-const state = { answers: {}, ut: {}, submitting: false, submitted: false, screenoutSent: false,
-                utSubmitting: false, utSubmitted: false };
+const state = { answers: {}, ut: {}, reward: {}, submitting: false, submitted: false, screenoutSent: false,
+                utSubmitting: false, utSubmitted: false, rewardSent: false };
 
 /* UT 신청 기록에는 설문 응답과 이어지는 값을 절대 넣지 않습니다.
    설문의 RESPONSE_UUID와 다른, 완전히 새로운 번호를 씁니다. */
@@ -311,7 +312,7 @@ const steps = {
   q14: { id: "q14", type: "textarea", required: false,
     title: "Q14. 최근 자산관리 앱을 사용하면서 불편하거나 답답했던 상황이 있다면 한 가지 적어주세요.",
     hint: "무엇을 확인하려 했는지, 어디에서 막혔는지, 결국 어떻게 해결했는지를 간단히 적어주세요. 선택 응답이라 비워두셔도 됩니다. 이름·계좌번호·구체적인 금융 금액 등 개인정보는 적지 말아주세요.",
-    next: () => "submitting",
+    next: () => "reward",
   },
 
   terminate_age: { id: "terminate_age", type: "terminate",
@@ -320,6 +321,8 @@ const steps = {
   terminate_app: { id: "terminate_app", type: "terminate",
     text: "응답해주셔서 감사합니다. 본 조사는 계좌·카드·투자 자산 관리 목적으로 앱을 사용해보신 분들을 대상으로 하고 있어, 여기서 설문이 종료됩니다.",
   },
+  reward: { id: "reward", type: "reward", next: () => "submitting" },
+
   submitting: { id: "submitting", type: "submitting" },
 
   /* --- 설문 저장 완료 후: UT 참여 의향 (설문 응답과 분리 저장) --- */
@@ -352,14 +355,14 @@ function render() {
   const isQuestion = QUESTION_TYPES.includes(step.type);
 
   // 제출이 끝난 뒤의 UT 단계에서는 뒤로가기를 막습니다(설문 재제출 방지).
-  backBtn.disabled = !(isQuestion && !step.isExtra && history.length > 0);
+  backBtn.disabled = !((isQuestion || step.type === "reward") && !step.isExtra && history.length > 0);
 
   if (isQuestion && !step.isExtra) {
     const qNum = QUESTION_ORDER.indexOf(step.id) + 1;
     document.getElementById("progressLabel").textContent = qNum + " / " + QUESTION_ORDER.length;
     document.getElementById("progressFill").style.width = Math.round((qNum / QUESTION_ORDER.length) * 100) + "%";
   } else {
-    document.getElementById("progressLabel").textContent = step.isExtra ? "설문 완료" : "";
+    document.getElementById("progressLabel").textContent = step.isExtra ? "설문 완료" : (step.type === "reward" ? "마지막 단계" : "");
     document.getElementById("progressFill").style.width = "100%";
   }
 
@@ -370,11 +373,19 @@ function render() {
         <p>이 설문은 계좌·카드·투자 자산의 '조회·관리' 경험을 개선하기 위한 학생 포트폴리오 조사입니다.</p>
         <p>· 소요 시간 약 3~4분</p>
         <p>· 설문 응답에는 이름·연락처 등 직접 식별 정보를 수집하지 않습니다</p>
-        <p>· 설문이 끝난 뒤, 후속 테스트 참여를 원하시는 분만 따로 연락처를 남기실 수 있습니다. 이때 남기신 연락처는 <b>설문 응답과 분리해 별도로 저장</b>되며, 서로 연결되지 않습니다</p>
+        <p>· 설문이 끝난 뒤, 이벤트 응모나 후속 테스트 참여를 원하시는 분만 따로 연락처를 남기실 수 있습니다. 이때 남기신 연락처는 <b>설문 응답과 분리해 별도로 저장</b>되며, 서로 연결되지 않습니다</p>
         <p>· 응답은 통계 및 주제 분석에 사용되며, 서술형 답변 일부는 개인을 식별할 수 없도록 익명 처리하여 포트폴리오에 인용될 수 있습니다</p>
         <p>· 서술형 응답에는 이름·계좌번호·구체적인 금융 금액 등 개인정보를 적지 말아주세요</p>
         <p>· 원본 응답은 분석 완료 후 30일 이내 삭제하며, 익명화된 집계 결과와 인용문은 포트폴리오에 계속 사용될 수 있습니다</p>
         <p>· 정답이 없는 조사입니다. 평소 느끼신 대로 답해주세요.</p>
+      </div>
+      <div class="intro-block" style="margin-top:16px; padding-top:16px; border-top:1px solid var(--border);">
+        <p><b>\u{1F381} 설문 참여 이벤트</b></p>
+        <p>설문을 끝까지 완료해주신 분 중 추첨으로 소정의 커피 기프티콘을 드립니다.</p>
+        <p>· 응모는 선택입니다. 응모하지 않으셔도 설문 참여에는 아무 영향이 없습니다</p>
+        <p>· 설문 마지막 단계에서 휴대폰 번호를 남기실 수 있으며, 이때 개인정보 수집·이용 동의가 필요합니다</p>
+        <p>· 남기신 번호는 설문 응답과 분리된 별도 저장소에 보관되어 어떤 답변을 하셨는지와 연결되지 않으며, 추첨도 응답 내용과 무관하게 무작위로 진행합니다</p>
+        <p>· 번호는 기프티콘 발송 목적으로만 사용하며, 2026년 10월 1일까지 발송한 뒤 즉시 폐기합니다</p>
       </div>
       <div class="footer"><button class="primary" id="nextBtn">설문 시작하기</button></div>`;
     document.getElementById("nextBtn").onclick = () => goTo("q1");
@@ -421,6 +432,34 @@ function render() {
       <p class="hint" id="skipUt" style="cursor:pointer; text-decoration:underline;">신청 없이 마치기</p></div>`;
     document.getElementById("retryUtBtn").onclick = () => goTo("ut_submitting");
     document.getElementById("skipUt").onclick = () => goTo("complete");
+    return;
+  }
+
+  if (step.type === "reward") {
+    const rw = state.reward;
+    card.innerHTML = `
+      <h2>\u{1F381} 설문 참여 이벤트 응모 <span style="font-weight:400; font-size:15px; color:var(--muted);">(선택)</span></h2>
+      <p class="hint">설문을 끝까지 완료해주신 분 중 추첨으로 소정의 커피 기프티콘을 드립니다.<br><b>응모하지 않으셔도 설문 제출에는 아무 영향이 없습니다.</b> 번호를 비워두고 제출하시면 됩니다.</p>
+
+      <p style="color:var(--text); font-size:15px; margin:20px 0 0;">기프티콘 받으실 휴대폰 번호를 적어주세요.</p>
+      <input type="tel" id="rewardContact" maxlength="20" placeholder="예: 010-1234-5678" value="${(rw.contact || "").replace(/"/g, "&quot;")}">
+
+      <div class="note" style="margin-top:22px;">
+        <b>개인정보 수집·이용 동의</b> (응모하실 때만 필요합니다)<br><br>
+        · 수집 항목: 휴대폰 번호<br>
+        · 이용 목적: 이벤트 당첨자 추첨 및 기프티콘 발송<br>
+        · 보유 기간: 2026년 10월 1일까지 발송한 뒤 즉시 폐기<br>
+        · 남기신 번호는 <b>설문 응답과 분리된 별도 저장소</b>에 보관되어 어떤 답변을 하셨는지와 연결되지 않으며, 추첨도 응답 내용과 무관하게 무작위로 진행합니다<br>
+        · 동의를 거부하실 수 있으며, 이 경우 이벤트 응모만 어려울 뿐 설문 제출에는 아무 영향이 없습니다
+      </div>
+      <div class="options" id="rewardConsent">
+        <label class="option${rw.consent === "동의" ? " selected" : ""}" data-value="동의">
+          <input type="radio" name="rewardConsent" ${rw.consent === "동의" ? "checked" : ""}><span>위 내용에 동의하고 응모합니다</span></label>
+      </div>
+
+      <p class="error" id="errMsg"></p>
+      <div class="footer"><button class="primary" id="nextBtn">제출하기</button></div>`;
+    attachRewardHandlers();
     return;
   }
 
@@ -536,7 +575,7 @@ function render() {
   }
 
   html += `<p class="error" id="errMsg"></p>
-    <div class="footer"><button class="primary" id="nextBtn">${step.id === "q14" ? "제출하기" : "다음"}</button></div>`;
+    <div class="footer"><button class="primary" id="nextBtn">다음</button></div>`;
 
   card.innerHTML = html;
   attachHandlers(step);
@@ -590,6 +629,28 @@ function attachHandlers(step) {
   }
 
   document.getElementById("nextBtn").onclick = () => handleNext(step);
+}
+
+function attachRewardHandlers() {
+  const rw = state.reward;
+  document.getElementById("rewardContact").oninput = (e) => { rw.contact = e.target.value; };
+  document.querySelectorAll("#rewardConsent .option").forEach(el => {
+    el.onclick = (e) => {
+      e.preventDefault();
+      rw.consent = (rw.consent === "동의") ? null : "동의";
+      render();
+    };
+  });
+  document.getElementById("nextBtn").onclick = () => {
+    const hasContact = !!(rw.contact || "").trim();
+    if (hasContact && rw.consent !== "동의") {
+      return showError("응모하시려면 수집·이용에 동의해주세요. 원하지 않으시면 번호를 지우고 제출하시면 됩니다.");
+    }
+    if (!hasContact && rw.consent === "동의") {
+      return showError("기프티콘 받으실 휴대폰 번호를 적어주세요.");
+    }
+    goTo("submitting");
+  };
 }
 
 function attachUtFormHandlers() {
@@ -685,6 +746,31 @@ async function logScreenout(terminateId) {
   } catch (e) { /* 집계용이라 실패해도 응답자 경험에는 영향 없음 */ }
 }
 
+/* 이벤트 응모 저장.
+   ★ 설문 응답(survey_responses)과 공통 식별자를 절대 두지 않습니다.
+     entry_uuid는 RESPONSE_UUID와 무관하게 새로 발급된 값이고,
+     survey_rewards에는 설문 답변을 어떤 형태로도 넣지 않습니다.
+   응모는 선택이므로 실패해도 설문 흐름을 막지 않습니다. */
+async function submitRewardEntry() {
+  const rw = state.reward;
+  const contact = (rw.contact || "").trim();
+  if (!contact || rw.consent !== "동의" || state.rewardSent) return;
+  if (!REWARD_ENTRY_UUID) REWARD_ENTRY_UUID = newUuid();
+  try {
+    const res = await fetch(SUPABASE_URL + "/rest/v1/survey_rewards", {
+      method: "POST", headers: supabaseHeaders(),
+      body: JSON.stringify({
+        entry_uuid: REWARD_ENTRY_UUID,
+        contact_value: contact,
+        consent_privacy: true,
+      }),
+    });
+    if (res.ok || res.status === 409) state.rewardSent = true;
+  } catch (e) {
+    console.error(e);
+  }
+}
+
 async function submitUtApplicant() {
   if (state.utSubmitting || state.utSubmitted) return;
   state.utSubmitting = true;
@@ -757,6 +843,7 @@ async function submitAnswers() {
     if (res.ok || res.status === 409) {
       state.submitted = true;
       state.submitting = false;
+      await submitRewardEntry(); // 실패해도 설문 응답은 이미 저장된 상태
       goTo("ut_ask");
       return;
     }
